@@ -1,16 +1,13 @@
-# train_model.py
-
 import tensorflow as tf
 from tensorflow.keras import layers, models
-import os
 
 # ✅ Dataset path
-data_dir = "dataset"  # your dataset folder
+data_dir = "dataset"
 img_size = (224, 224)
 batch_size = 32
 
-# ✅ Load dataset
-train_ds = tf.keras.preprocessing.image_dataset_from_directory(
+# ✅ Load dataset (first)
+train_ds_raw = tf.keras.preprocessing.image_dataset_from_directory(
     data_dir,
     validation_split=0.2,
     subset="training",
@@ -18,7 +15,7 @@ train_ds = tf.keras.preprocessing.image_dataset_from_directory(
     image_size=img_size,
     batch_size=batch_size
 )
-val_ds = tf.keras.preprocessing.image_dataset_from_directory(
+val_ds_raw = tf.keras.preprocessing.image_dataset_from_directory(
     data_dir,
     validation_split=0.2,
     subset="validation",
@@ -27,11 +24,20 @@ val_ds = tf.keras.preprocessing.image_dataset_from_directory(
     batch_size=batch_size
 )
 
-# ✅ Get class names
-class_names = train_ds.class_names
-print("Class Names:", class_names)
+# ✅ Get class names before mapping
+class_names = train_ds_raw.class_names
+print("✅ Class Names:", class_names)
 
-# ✅ Optimize dataset performance
+# ✅ Ensure all images are converted to RGB
+def convert_to_rgb(image, label):
+    image = tf.image.grayscale_to_rgb(image) if image.shape[-1] == 1 else image
+    return image, label
+
+# ✅ Apply the RGB conversion
+train_ds = train_ds_raw.map(convert_to_rgb)
+val_ds = val_ds_raw.map(convert_to_rgb)
+
+# ✅ Optimize dataset pipeline
 AUTOTUNE = tf.data.AUTOTUNE
 train_ds = train_ds.prefetch(AUTOTUNE)
 val_ds = val_ds.prefetch(AUTOTUNE)
@@ -43,44 +49,32 @@ data_augmentation = tf.keras.Sequential([
     layers.RandomZoom(0.1),
 ])
 
-# ✅ Pretrained base model
+# ✅ Pretrained base (EfficientNetB0)
 base_model = tf.keras.applications.EfficientNetB0(
     include_top=False,
     weights="imagenet",
     input_shape=img_size + (3,)
 )
-base_model.trainable = False  # freeze base layers initially
+base_model.trainable = False
 
-# ✅ Build model
+# ✅ Build Model
 inputs = layers.Input(shape=img_size + (3,))
 x = data_augmentation(inputs)
 x = tf.keras.applications.efficientnet.preprocess_input(x)
 x = base_model(x, training=False)
 x = layers.GlobalAveragePooling2D()(x)
 x = layers.Dropout(0.3)(x)
-outputs = layers.Dense(len(class_names), activation='softmax')(x)
+outputs = layers.Dense(len(class_names), activation="softmax")(x)
 model = models.Model(inputs, outputs)
 
-# ✅ Compile model
-model.compile(optimizer='adam',
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
+# ✅ Compile
+model.compile(optimizer="adam",
+              loss="sparse_categorical_crossentropy",
+              metrics=["accuracy"])
 
-# ✅ Train model
-history = model.fit(train_ds, validation_data=val_ds, epochs=50)
+# ✅ Train (for quick test: use 5–10 epochs)
+history = model.fit(train_ds, validation_data=val_ds, epochs=20)
 
-# ✅ Fine-tune top layers (optional)
-base_model.trainable = True
-fine_tune_at = len(base_model.layers) - 50
-for layer in base_model.layers[:fine_tune_at]:
-    layer.trainable = False
-
-model.compile(optimizer=tf.keras.optimizers.Adam(1e-4),
-              loss='sparse_categorical_crossentropy',
-              metrics=['accuracy'])
-
-history_finetune = model.fit(train_ds, validation_data=val_ds, epochs=50)
-
-# ✅ Save model in TF format (no .h5 issues)
+# ✅ Save model safely
 model.save("animal_classifier_model.keras")
-print("✅ Model saved successfully as 'animal_classifier_model/'")
+print("🎉 Model saved successfully as 'animal_classifier_model.keras'")
