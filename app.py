@@ -60,9 +60,14 @@ CLASS_NAMES = [
 # =========================================================
 uploaded_file = st.file_uploader("Upload an image...", type=["jpg", "jpeg", "png"])
 
+# ...existing code...
+
+# Update the preprocessing section
 if uploaded_file is not None:
     image = Image.open(uploaded_file)
-    image = image.convert("RGB")  # ✅ ensures 3 channels always
+    # Force convert to RGB
+    image = image.convert('RGB')
+    
     col1, col2 = st.columns(2)
     
     with col1:
@@ -71,11 +76,13 @@ if uploaded_file is not None:
     with col2:
         st.write("🎯 Processing image...")
 
-        # ✅ Preprocess image
-        img = image.resize((224, 224))
+        # ✅ Preprocess image - ensure correct size and channels
+        img = image.resize((224, 224))  # Confirm this matches your model's input size
         img_array = tf.keras.preprocessing.image.img_to_array(img)
         img_array = np.expand_dims(img_array, axis=0)
         img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
+
+# ...existing code...
 
         # ✅ Predict
         predictions = model.predict(img_array)
