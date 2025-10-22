@@ -101,10 +101,28 @@ if uploaded_file:
         st.markdown("</div>", unsafe_allow_html=True)
 
     # Preprocess
+        # =========================================================
+    # 🖼️ Preprocess Image Safely
+    # =========================================================
+    image = Image.open(uploaded_file)
+
+    # 🔹 Force 3-channel RGB format
+    if image.mode != "RGB":
+        image = image.convert("RGB")
+
+    # 🔹 Resize correctly to 224x224 (EfficientNetB0 standard)
     img = image.resize((224, 224))
     img_array = tf.keras.preprocessing.image.img_to_array(img)
+
+    # ✅ Double-check shape (should be 224x224x3)
+    if img_array.shape[-1] != 3:
+        st.error(f"Invalid image format! Expected 3 channels but got {img_array.shape[-1]}")
+        st.stop()
+
+    # 🔹 Expand and preprocess for EfficientNet
     img_array = np.expand_dims(img_array, axis=0)
     img_array = tf.keras.applications.efficientnet.preprocess_input(img_array)
+
 
     # Predict
     predictions = model.predict(img_array)
